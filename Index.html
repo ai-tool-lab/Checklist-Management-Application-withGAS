@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <!-- <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?> -->
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <h1 class="app-title">チェックリスト管理</h1>
+    </header>
+
+    <nav class="tab-nav">
+      <button class="tab-button" id="tab-new" data-view="new-entry" onclick="switchView(this)">
+        <i class="fas fa-plus-circle"></i> 新規登録
+      </button>
+      <button class="tab-button active" id="tab-history" data-view="history" onclick="switchView(this)">
+        <i class="fas fa-history"></i> 履歴
+      </button>
+      <button class="tab-button" id="tab-settings" data-view="settings" onclick="switchView(this)">
+        <i class="fas fa-cog"></i> 項目設定
+      </button>
+    </nav>
+
+    <main class="view-container">
+
+      <div id="edit-modal" class="modal" style="display: none;">
+          <div class="modal-content">
+              <span class="close-button" onclick="closeEditModal()">&times;</span>
+              <h2>履歴の編集</h2>
+              
+              <form id="edit-form" onsubmit="handleEditSave(event)">
+                  <input type="hidden" id="edit-row-number" name="rowNumber">
+
+                  <div class="form-group">
+                      <label for="edit-reg-date">登録日 *</label>
+                      <input type="date" id="edit-reg-date" name="date" required>
+                  </div>
+                  
+                  <div id="edit-checklist-items-container">
+                      </div>
+
+                  <div class="form-group">
+                      <label for="edit-memo">メモ</label>
+                      <textarea id="edit-memo" name="memo" rows="4" placeholder="メモを入力してください..."></textarea>
+                  </div>
+                  
+                  <button type="submit" class="btn btn-primary">更新</button>
+              </form>
+          </div>
+      </div>
+
+      <section id="view-history" class="view active">
+        <h2>登録履歴</h2>
+        <div id="history-list" class="card-list">
+          <p class="loading-text">履歴を読み込み中...</p>
+        </div>
+      </section>
+
+      <section id="view-new-entry" class="view" style="display: none;">
+        <h2>新規チェックリスト</h2>
+        <form id="new-entry-form" onsubmit="handleNewEntry(event)">
+          <div class="form-group">
+            <label for="reg-date">登録日 *</label>
+            <input type="date" id="reg-date" name="date" required>
+          </div>
+          
+          <div id="checklist-items-container">
+            </div>
+
+          <div class="form-group">
+            <label for="memo">メモ</label>
+            <textarea id="memo" name="memo" rows="4" placeholder="メモを入力してください..."></textarea>
+          </div>
+          
+          <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+      </section>
+      
+      <section id="view-settings" class="view" style="display: none;">
+        <h2>チェック項目設定</h2>
+        <div class="info-box">
+          <ul>
+            <li>空欄の項目は表示されません</li>
+            <li>ドラッグ＆ドロップで並び替えができます（実装を簡略化するため今回はドラッグ＆ドロップは省略し、削除ボタンのみとします）</li>
+            <li>最低 3個 登録必須、最大 10個 の登録が可能です</li>
+            <li id="current-item-count">有効な項目: 0個</li>
+          </ul>
+        </div>
+        
+        <form id="settings-form" onsubmit="handleSettingsSave(event)">
+            <div id="config-items-container">
+                </div>
+            <button type="button" class="btn btn-success" onclick="addNewConfigItem()">+ 項目を追加</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+      </section>
+
+    </main>
+  </div>
+  
+  <script>
+    // 画面切り替え関数
+    function switchView(button) {
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+      
+      const targetView = button.dataset.view;
+      document.querySelectorAll('.view').forEach(view => {
+        view.style.display = 'none';
+      });
+      document.getElementById('view-' + targetView).style.display = 'block';
+      
+      // 画面に応じた初期化処理
+      if (targetView === 'new-entry') {
+        loadConfigAndInitNewEntry();
+      } else if (targetView === 'history') {
+        loadHistory();
+      } else if (targetView === 'settings') {
+        loadConfigAndInitSettings();
+      }
+    }
+
+    // 初期処理：本日日付をセットし、履歴画面を表示
+    document.addEventListener('DOMContentLoaded', () => {
+      // 本日日付のセット（仕様）
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = document.getElementById('reg-date');
+      if (dateInput) dateInput.value = today;
+      
+      // 初期は履歴画面を表示（activeクラスで制御）
+      document.getElementById('tab-history').click();
+    });
+    
+    // --- GAS連携関数（新規登録） ---
+    function handleNewEntry(event) {
+      event.preventDefault();
+      
+      const form = event.target;
+      const formData = {
+        date: form.date.value,
+        memo: form.memo.value,
+        checks: Array.from(form.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value)
+      };
+      
+      // 日付は入力必須（HTMLのrequired属性で対応済みだが念のため）
+      if (!formData.date) {
+        alert('登録日は必須です。');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.status === 'success') {
+            alert('チェックリストを保存しました！');
+            form.reset(); // フォームをリセット
+            loadConfigAndInitNewEntry(); // 再度初期化（チェック項目の再描画）
+          } else {
+            alert('保存に失敗しました: ' + res.message);
+          }
+        })
+        .saveChecklist(formData);
+    }
+    
+    // --- GAS連携関数（履歴） ---
+    function loadHistory() {
+        const listContainer = document.getElementById('history-list');
+        listContainer.innerHTML = '<p class="loading-text">履歴を読み込み中...</p>';
+
+        google.script.run
+            .withSuccessHandler(data => {
+                // dataがnullでないことを保証（GAS側で処理済みのはずだが、念のため）
+                if (!Array.isArray(data)) {
+                    listContainer.innerHTML = '<p class="error-text">データの読み込み中に予期せぬエラーが発生しました。</p>';
+                    return;
+                }
+
+                listContainer.innerHTML = ''; // クリア
+                if (data.length === 0) {
+                    listContainer.innerHTML = '<p class="no-data-text">まだ登録履歴がありません。</p>';
+                    return;
+                }
+
+                data.forEach(entry => {
+                    const card = document.createElement('div');
+                    card.className = 'card history-card';
+                    
+                    // 修正1: entry.checks が null/undefined の場合に備えて安全なアクセスに修正
+                    let checksHtml = (entry.checks ?? []).map(item => `
+                        <div class="check-item ${item.isChecked ? 'checked' : 'unchecked'}">
+                            <i class="far ${item.isChecked ? 'fa-check-circle' : 'fa-circle'}"></i>
+                            <span>${item.name}</span>
+                        </div>
+                    `).join('');
+                    
+                    // 修正2: entry.memo の内容を動的に表示するように修正
+                    let memoHtml = entry.memo 
+                        ? `<div class="memo-text">${entry.memo}</div>` 
+                        : '';
+
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <i class="far fa-calendar-alt"></i> <span>${new Date(entry.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short' })}</span>
+                            <div class="actions">
+                                <button class="btn-icon" onclick="openEditModal(${entry.rowNumber})"><i class="fas fa-pencil-alt"></i></button>
+                                <button class="btn-icon delete-btn" onclick="handleDelete(${entry.rowNumber})"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            ${checksHtml}
+                            ${memoHtml}
+                        </div>
+                    `;
+                    listContainer.appendChild(card);
+                });
+            })
+            // .withFailureHandler(function(error) { ... }) を追加すると、エラー時のデバッグが容易になります
+            .getHistory();
+    }
+    
+    // --- GAS連携関数（項目設定） ---
+    function loadConfigAndInitSettings() {
+      google.script.run
+        .withSuccessHandler(config => {
+          const container = document.getElementById('config-items-container');
+          container.innerHTML = '';
+          
+          config.forEach(item => {
+            addNewConfigItem(item.name);
+          });
+
+          // 項目が0件の場合に初期の3件を追加（ユーザーフレンドリーにするため）
+          if (config.length === 0) {
+            addNewConfigItem('朝食を食べた');
+            addNewConfigItem('運動をした');
+            addNewConfigItem('水分補給をした');
+          }
+          updateItemCount();
+        })
+        .getConfigItems();
+    }
+    
+    function addNewConfigItem(initialValue = '') {
+      const container = document.getElementById('config-items-container');
+      const itemWrapper = document.createElement('div');
+      itemWrapper.className = 'config-item-wrapper';
+      itemWrapper.innerHTML = `
+        <div class="drag-handle"><i class="fas fa-bars"></i></div>
+        <input type="text" name="itemName" value="${initialValue}">
+        <button type="button" class="btn-icon delete-config-item" onclick="deleteConfigItem(this)"><i class="fas fa-trash-alt"></i></button>
+      `;
+      container.appendChild(itemWrapper);
+      updateItemCount();
+    }
+    
+    function deleteConfigItem(button) {
+        button.closest('.config-item-wrapper').remove();
+        updateItemCount();
+    }
+
+    function updateItemCount() {
+        const count = document.querySelectorAll('#config-items-container input[name="itemName"]').length;
+        document.getElementById('current-item-count').textContent = '有効な項目: ' + count + '個';
+    }
+
+    function handleSettingsSave(event) {
+        event.preventDefault();
+        const itemInputs = Array.from(document.querySelectorAll('#config-items-container input[name="itemName"]'));
+        const itemNames = itemInputs.map(input => input.value.trim());
+
+        const validItems = itemNames.filter(name => name !== '');
+        
+        // 仕様: 最低3個登録必須
+        if (validItems.length < 3) {
+            alert('項目は最低3個登録してください。（空欄を除く）');
+            return;
+        }
+        // 仕様: 最大10個登録可能
+        if (validItems.length > 10) {
+            alert('項目は最大10個までしか登録できません。');
+            return;
+        }
+        
+        google.script.run
+            .withSuccessHandler(res => {
+                if (res.status === 'success') {
+                    alert(res.message);
+                    loadConfigAndInitSettings(); // 再描画
+                } else {
+                    alert('保存に失敗しました: ' + res.message);
+                }
+            })
+            .saveConfigItems(itemNames);
+    }
+    
+    // --- 新規登録画面のチェック項目動的生成 ---
+    function loadConfigAndInitNewEntry() {
+        google.script.run
+            .withSuccessHandler(config => {
+                const container = document.getElementById('checklist-items-container');
+                container.innerHTML = '';
+
+                // チェック項目の描画
+                config.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'checkbox-group';
+                    itemDiv.innerHTML = `
+                        <input type="checkbox" id="check-${item.id}" name="checkItem" value="${item.id}">
+                        <label for="check-${item.id}">${item.name}</label>
+                    `;
+                    container.appendChild(itemDiv);
+                });
+                
+                if (config.length === 0) {
+                    container.innerHTML = '<p class="info-text">項目設定画面でチェック項目を登録してください。</p>';
+                }
+            })
+            .getConfigItems();
+    }
+
+    /**
+     * 履歴編集モーダルを開き、データをセットする
+     * @param {number} rowNumber - 編集対象の行番号
+     */
+    function openEditModal(rowNumber) {
+        // 編集対象の履歴データを取得
+        google.script.run
+            .withSuccessHandler(historyData => {
+                // historyDataはgetHistory()が返す配列全体なので、対象の行番号のエントリを探す
+                const entry = historyData.find(e => e.rowNumber === rowNumber);
+                
+                if (!entry) {
+                    alert('編集対象のデータが見つかりませんでした。');
+                    return;
+                }
+
+                // 1. 行番号を隠しフィールドにセット
+                document.getElementById('edit-row-number').value = rowNumber;
+                
+                // 2. 日付とメモをセット
+                // ISO形式の文字列をDateオブジェクトに変換して、YYYY-MM-DD形式に戻す
+                const dateStr = new Date(entry.date).toISOString().split('T')[0];
+                document.getElementById('edit-reg-date').value = dateStr;
+                document.getElementById('edit-memo').value = entry.memo;
+                
+                // 3. チェック項目を生成し、状態をセット
+                const container = document.getElementById('edit-checklist-items-container');
+                container.innerHTML = '';
+                
+                entry.checks.forEach((item, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'checkbox-group';
+                    itemDiv.innerHTML = `
+                        <input type="checkbox" id="edit-check-${index}" name="checkItem" value="${item.id}" ${item.isChecked ? 'checked' : ''}>
+                        <label for="edit-check-${index}">${item.name}</label>
+                    `;
+                    container.appendChild(itemDiv);
+                });
+
+                // 4. モーダルを表示
+                document.getElementById('edit-modal').style.display = 'block';
+
+            })
+            .getHistory(); // 全履歴を取得して処理
+    }
+
+    // 編集モーダルを閉じる
+    function closeEditModal() {
+        document.getElementById('edit-modal').style.display = 'none';
+    }
+
+    // モーダル外クリックで閉じる処理 (必要に応じて)
+    window.onclick = function(event) {
+        const modal = document.getElementById('edit-modal');
+        if (event.target == modal) {
+            closeEditModal();
+        }
+    }
+
+    // 編集フォームの送信を処理
+    function handleEditSave(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const rowNumber = parseInt(form.rowNumber.value); // 隠しフィールドから行番号を取得
+
+        const formData = {
+            date: form.date.value,
+            memo: form.memo.value,
+            // チェックされた項目のID (ConfigのID) の配列を作成
+            checks: Array.from(form.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value)
+        };
+        
+        if (!formData.date || !rowNumber) {
+            alert('エラー: 登録日または行番号が不正です。');
+            return;
+        }
+
+        google.script.run
+            .withSuccessHandler(res => {
+                if (res.status === 'success') {
+                    alert(res.message);
+                    closeEditModal(); // モーダルを閉じる
+                    loadHistory(); // 履歴を再読み込み
+                } else {
+                    alert('更新に失敗しました: ' + res.message);
+                }
+            })
+            .updateChecklist(rowNumber, formData);
+    }
+
+    /**
+     * 履歴を削除する関数
+     * @param {number} rowNumber - 削除対象の行番号
+     */
+    function handleDelete(rowNumber) {
+        if (!confirm('本当にこの履歴を削除しますか？')) {
+            return;
+        }
+
+        google.script.run
+            .withSuccessHandler(res => {
+                if (res.status === 'success') {
+                    alert(res.message);
+                    loadHistory(); // 履歴を再読み込みして画面を更新
+                } else {
+                    alert('削除に失敗しました: ' + res.message);
+                }
+            })
+            .deleteChecklist(rowNumber);
+    }
+
+  </script>
+</body>
+</html>

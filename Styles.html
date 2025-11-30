@@ -1,0 +1,345 @@
+<style>
+  /* 落ち着いた青をベースカラーに設定 */
+  :root {
+    --color-primary: #3478F6; /* メインカラー */
+    --color-secondary: #004D99; /* 濃いめの青 */
+    --color-background: #F4F7FC; /* 優しい背景色 */
+    --color-border: #E0E0E0;
+    --color-success: #28A745;
+    --color-error: #DC3545;
+  }
+
+  /* FontAwesome (アイコン) の読み込み */
+  /* @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css'); */
+
+  /* 全体のリセットとレスポンシブデザインの基礎 */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  body {
+    background-color: var(--color-background);
+    padding: 10px;
+  }
+
+  .container {
+    max-width: 600px;
+    margin: 0 auto; /* 中央寄せ */
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  
+  /* ヘッダーとタイトル */
+  .app-header {
+    padding: 20px 15px 0;
+    text-align: center;
+  }
+  .app-title {
+    font-size: 1.5rem;
+    color: #333;
+    margin-bottom: 20px;
+  }
+
+  /* タブメニュー */
+  .tab-nav {
+    display: flex;
+    justify-content: space-around;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 10px;
+  }
+  .tab-button {
+    flex-grow: 1;
+    background: none;
+    border: none;
+    padding: 12px 5px;
+    color: #555;
+    font-size: 1rem;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap; /* スマホでの折り返しを防ぐ */
+  }
+  .tab-button.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    font-weight: 600;
+  }
+  .tab-button i {
+      margin-right: 5px;
+  }
+
+  /* メインコンテンツ */
+  .view-container {
+    padding: 20px 15px;
+  }
+  .view h2 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    color: #333;
+  }
+  
+  /* フォームグループ */
+  .form-group {
+    margin-bottom: 15px;
+  }
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #444;
+  }
+  input[type="date"], input[type="text"], textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+
+  /* ボタン */
+  .btn {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+    font-size: 1rem;
+    margin-top: 10px;
+  }
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: #fff;
+    width: 100%; /* 保存ボタンを横幅いっぱいに */
+  }
+  .btn-primary:hover {
+    background-color: var(--color-secondary);
+  }
+  .btn-success {
+      background-color: var(--color-success);
+      color: #fff;
+      margin-right: 10px;
+      width: calc(50% - 5px);
+  }
+  
+  /* チェックボックスデザイン */
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .checkbox-group:last-child {
+      border-bottom: none;
+  }
+  .checkbox-group input[type="checkbox"] {
+    /* 実際のチェックボックスを隠す */
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+  .checkbox-group label {
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    font-weight: normal;
+    font-size: 1.05rem;
+    color: #333;
+  }
+  /* カスタムチェックマーク */
+  .checkbox-group label::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 20px;
+    width: 20px;
+    border: 2px solid #aaa;
+    border-radius: 50%; /* 丸いチェックボックス */
+    background-color: #fff;
+    transition: all 0.2s;
+  }
+  .checkbox-group input[type="checkbox"]:checked + label::before {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+  }
+  .checkbox-group input[type="checkbox"]:checked + label::after {
+    content: '\f00c'; /* FontAwesomeのチェックマーク */
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    color: #fff;
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+  }
+
+  /* 履歴カード (カードリスト) */
+  .card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+  }
+  .card {
+      background-color: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      padding: 15px;
+  }
+  .history-card .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #f0f0f0;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+  }
+  .history-card .card-header span {
+      font-weight: 600;
+      color: #333;
+      margin-left: 5px;
+  }
+  .history-card .card-header i {
+      color: var(--color-primary);
+  }
+  .history-card .actions .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-left: 10px;
+      padding: 0;
+  }
+  .history-card .actions .btn-icon i {
+      color: #666;
+      font-size: 1.1rem;
+  }
+  .history-card .actions .delete-btn i {
+      color: var(--color-error);
+  }
+  
+  .history-card .check-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+  }
+  .history-card .check-item i {
+      margin-right: 8px;
+      font-size: 1.1rem;
+  }
+  /* チェック済みの色を緑色に設定 */
+  .history-card .check-item.checked i {
+      color: var(--color-success); /* #28A745 (緑色) */
+      font-weight: 900; /* アイコンを太くして視認性を高める */
+  }
+  /* 未チェックの色を灰色に設定 */
+  .history-card .check-item.unchecked i {
+      color: #aaa; /* 灰色 */
+  }
+  .history-card .memo-text {
+      border-top: 1px solid #f0f0f0;
+      padding-top: 10px;
+      margin-top: 10px;
+      color: #555;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+  }
+  
+  /* 項目設定画面 */
+  .config-item-wrapper {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+  }
+  .config-item-wrapper input[type="text"] {
+      flex-grow: 1;
+      margin: 0 10px;
+  }
+  .config-item-wrapper .drag-handle {
+      cursor: grab;
+      color: #aaa;
+  }
+  .config-item-wrapper .delete-config-item {
+      background: none;
+      border: none;
+      color: var(--color-error);
+      cursor: pointer;
+  }
+  .info-box {
+      background-color: #E6F0FF; /* 薄い青 */
+      border: 1px solid var(--color-primary);
+      color: var(--color-secondary);
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+  }
+  .info-box ul {
+      list-style-position: inside;
+      list-style-type: disc;
+      padding-left: 0;
+  }
+  .info-box li {
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+  }
+  
+  .loading-text, .no-data-text, .info-text {
+      text-align: center;
+      color: #777;
+      padding: 20px 0;
+  }
+
+  /* モーダル背景 */
+  .modal {
+      display: none; /* 初期は非表示 */
+      position: fixed;
+      z-index: 100; /* 最前面に表示 */
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.6); /* 半透明の黒 */
+  }
+
+  /* モーダル内容 */
+  .modal-content {
+      background-color: #fefefe;
+      margin: 10% auto; /* 上下中央寄せ */
+      padding: 20px;
+      border: 1px solid #888;
+      width: 90%; 
+      max-width: 500px; /* スマホでも見やすい最大幅 */
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+
+  /* 閉じるボタン */
+  .close-button {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+  }
+  .close-button:hover,
+  .close-button:focus {
+      color: #000;
+      text-decoration: none;
+  }
+</style>
